@@ -7,17 +7,33 @@ __copyright__ = "Copyright 2020, JK"
 __license__ = "GPL3"
 __version__ = "0.0.1"
 
+try:  # try MicroPython
+    import uos as os
+    MICROPYTHON = True
+except:  # CPython
+    MICROPYTHON = False
 
-import uos
+# import system modules used in this module
+import gc
+gc.collect()
 import select
 import sys
-import json
 
-import tty
+# preimport system modules to reduce memory usage in importing telex module
+if MICROPYTHON:
+    gc.collect()
+    import machine
+    gc.collect()
+    import json
+    gc.collect()
+    import tty
+    gc.collect()
+
+# import telex module
 import telex
 
 
-def run():
+def run(cnfName:str=None):
     print('')
     #print('=== MicroTelex ===')
     print(r"   __  ____            ______    __       ")
@@ -29,20 +45,11 @@ def run():
     print('Platform:        ', sys.platform)
     print('Version:         ', sys.version)
     print('Implementation:  ', sys.implementation)
+    print('Free Memory:     ', gc.mem_free())
 
-    with open('telex.json', 'r') as f:
-        cnf = json.load(f)
-    print('Config:          ', cnf)
-    print('')
-
-    with telex.Telex(
-        cnf['BAUD'], 
-        cnf['PIN']['TX'], cnf['PIN']['RX'], 
-        cnf['PIN']['RLY'], 
-        cnf['PIN']['LED']
-        ) as t:
-        # t = tty.TTY(2, 0, 4, 5)   # ESP8266
-        # t = tty.TTY(2, 4, 16, 17)   # ESP32
+    with telex.Telex(cnfName) as t:
+        print('Config:          ', t.cnf)
+        print('')
 
         # polling from stdin
         poller = select.poll()
@@ -51,7 +58,7 @@ def run():
         while t.run:
             # wait till character from stdin or timeout
             events = poller.poll(50)
-            #events, x, y = select.select([sys.stdin], [], [], 1.0)
+            #events, x, y = select.select([sys.stdin], [], [], 0.075)
             # print(events)
 
             for file in events:
@@ -69,5 +76,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-
-

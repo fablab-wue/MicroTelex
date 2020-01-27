@@ -41,34 +41,61 @@ if MICROPYTHON:
     #import ujson as json
     #from _thread import allocate_lock as RLock
 
+    import gc
+    gc.collect()
     from machine import Pin
     from machine import PWM
+    gc.collect()
 
 else:  # CPython
     #import os
     #import json
     #from threading import RLock
 
+    import gc
     from debug_pc.machine import Pin
     from debug_pc.machine import PWM
 
     def const(x):
         return x
 
+gc.collect()
 from tty import TTY
+gc.collect()
 from bmcode import BaudotMurrayCode
+gc.collect()
+import json
+gc.collect()
 
-#import sys
-#import time
+###############################################################################
+
+HELP_TEXT = '''
+Option HELP not licensed!
+Upgrade to PRO version...
+'''
+
+DEFAULT_CONFIG_FILE = 'telex.json'
 
 ###############################################################################
 
 class Telex():
-    def __init__(_, baud:float=50, tx:int=4, rx:int=0, rly:int=5, led:int=2, sw:int=None, txInvert:bool=False, rxInvert:bool=False):
+    def __init__(_, cnfName:str=None):
+
         _._rxCharBuffer = []
         _._escape = False
 
-        #_.setDialMode(False)
+        # config file
+
+        if cnfName is None:
+            cnfName = DEFAULT_CONFIG_FILE
+        with open(cnfName, 'r') as f:
+            _.cnf = json.load(f)
+        assert _.cnf
+
+        if 'PIN' not in _.cnf:
+            raise Exception('Missing PIN section in json file')
+
+        cnfPin = _.cnf['PIN']
 
         # coder from BaudotMurrayCode to ASCII
         
@@ -76,24 +103,37 @@ class Telex():
 
         # Pins
         
-        _._pinRly = Pin(rly, Pin.OUT, value=0)
-        pinLED = Pin(led, Pin.OUT, value=0)
-        _._pwmLED = PWM(pinLED, freq=125, duty=512)
-        if sw is not None:
-            _._pinSw = Pin(sw, Pin.IN, Pin.PULL_UP)
+        if 'RLY_GPIO' in cnfPin:
+            _._pinRly = Pin(cnfPin['RLY_GPIO'], Pin.OUT, value=0)
+        if 'LED_GPIO' in cnfPin:
+            pinLED = Pin(cnfPin['LED_GPIO'], Pin.OUT, value=0)
+            _._pwmLED = PWM(pinLED, freq=125, duty=512)
+        if 'ONS_GPIO' in cnfPin:
+            _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN, Pin.PULL_UP)
             _._swState = 0
             _._swCounter = 0
 
         # TTY
         
-        timer = 1   #TODO default timer dependent on baudrate
+        txdInvert = cnfPin.get('TXD_INVERT', False)
+        rxdInvert = cnfPin.get('RXD_INVERT', False)
+        baud = _.cnf.get('BAUD', 50)
+        timer = 2   #TODO default timer dependent on baudrate
         if baud >= 70:
             timer = 1
-        _._tty = TTY(baud, timer, tx, rx, txInvert, rxInvert)
+        _._tty = TTY(baud, timer, cnfPin['TXD_GPIO'], cnfPin['RXD_GPIO'], txdInvert, rxdInvert)
+
+        if 'TN' in _.cnf and _.cnf['TN']:
+            TN = '[\r\n' + _.cnf['TN'] + ']'
+            codeTN = _._bm.encodeA2BM(TN)
+            _._tty.setTN(codeTN)
+            print(_.cnf['TN'], codeTN)   #debug
+            _._bm.reset()
 
         # public
 
         _.run = True
+        _.keyDial = False
 
     # -----
 
@@ -109,8 +149,20 @@ class Telex():
 
     def __exit__(_, type, value, tb):
         if _._tty:
-            #_._tty.deinit()
             del _._tty
+
+    # -----
+
+    def __repr__(_):
+        return "<Telex class '{}', tx={}{}, rx={}{}, baud={}, tty={}>".format(
+            _.cnf['NAME'],
+            _.cnf['PIN']['TXD_GPIO'],
+            'i' if _.cnf['PIN'].get('TXD_INVERT', False) else '',
+            _.cnf['PIN']['RXD_GPIO'],
+            'i' if _.cnf['PIN'].get('RXD_INVERT', False) else '',
+            _.cnf['BAUD'],
+            _._tty.getStateStr()
+            )
 
     # =====
 
@@ -140,7 +192,7 @@ class Telex():
                 _._escape = False
                 _.cmd(a)
             else:
-                print(a.lower(), end='')
+                #print(a.lower(), end='')   #debug
                 bs = _._bm.encodeA2BM(a)
                 if bs:
                     _._tty.write(bs)
@@ -171,15 +223,10 @@ class Telex():
 
     # -----
 
-    def setDialMode(_, enable:bool) -> None:
-        _.dial(enable)
-
-    # -----
-
     def cmd(_, c:str) -> None:
         c = c.upper()
 
-        if c == 'E':
+        if c == 'Q':
             _.run = False
         elif c == 'A':
             _.power(True)
@@ -191,8 +238,10 @@ class Telex():
             _.dial(False)
         elif c == 'R':
             _.write('RYRYRYRYRY')
-        elif c == 'Q':
+        elif c == 'F':
             _.write('THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG')
+        elif c == 'H':
+            print(HELP_TEXT)
         else:
             c = '?'
         print('{' + c + '}', end='')
@@ -200,12 +249,34 @@ class Telex():
     # -----
 
     def power(_, enable:bool) -> None:
-        _._pinRly.value(enable)
+        if _._pinRly:
+            #TODO ignore inputs for 1 sec
+            _._pinRly.value(enable)
 
     # -----
 
     def dial(_, enable:bool) -> None:
-        _._tty.dial(enable)
+        pulseDial = _.cnf.get('PULSE_DIAL', False)
+        if pulseDial:
+            _._tty.dial(enable)
+        else:
+            _.keyDial = enable
+            if _.keyDial:
+                _.power(True)
+
+    # -----
+
+    @property
+    def t(_) -> str:
+        ret = ''
+        _._syncCharBuffer()
+        while _._rxCharBuffer:
+            ret += _._rxCharBuffer.pop(0)
+        return ret
+
+    @t.setter
+    def t(_, ascii:str):
+        _.write(ascii)
 
 ###############################################################################
 

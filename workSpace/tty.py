@@ -2,9 +2,9 @@
 """
 Communication with historic teletype (TTY, german Fernschreiber) on chip ESP8266 or ESP32
 
-Default ESP8266 Pinout on Board 'Wemos D1 mini (pro)':
+Example Pinout for ESP8266 on Board 'Wemos D1 mini (pro)':
 TX      D4  GPIO2 (low active, board LED)
-RX      D3  GPIO0 (with pullup, boot, board Button)
+RX      D3  GPIO0 (with pullup, boot, (board Button))
 Free    D0...D2, D5...D8, A0
 
 """
@@ -35,23 +35,23 @@ else:  # CPython
 
 ###############################################################################
 
-STATE_MASK_LISTEN = 0x10
-STATE_MASK_CAN_TX = 0x20
-STATE_MASK_DIAL = 0x40
-STATE_MASK_WAIT = 0x80
+STATE_MASK_LISTEN = const(0x10)
+STATE_MASK_CAN_TX = const(0x20)
+STATE_MASK_DIAL = const(0x40)
+STATE_MASK_WAIT = const(0x80)
 
-STATE_LISTEN = STATE_MASK_LISTEN
-STATE_LISTEN_CAN_TX = STATE_MASK_LISTEN | STATE_MASK_CAN_TX
+STATE_LISTEN = const(STATE_MASK_LISTEN)
+STATE_LISTEN_CAN_TX = const(STATE_MASK_LISTEN | STATE_MASK_CAN_TX)
 
-STATE_RX = 0x1
-STATE_TX = 0x2
-STATE_TX_LISTEN = 0x2 | STATE_MASK_LISTEN
+STATE_RX = const(0x1)
+STATE_TX = const(0x2)
+STATE_TX_LISTEN = const(0x2 | STATE_MASK_LISTEN)
 
-STATE_OFF = 0xF
+STATE_OFF = const(0xF)
 
-STATE_DIAL_WAIT = STATE_MASK_DIAL | 0x0
-STATE_DIAL_PULSE = STATE_MASK_DIAL | 0x1
-STATE_DIAL_PAUSE = STATE_MASK_DIAL | 0x2
+STATE_DIAL_WAIT = const(STATE_MASK_DIAL | 0x0)
+STATE_DIAL_PULSE = const(STATE_MASK_DIAL | 0x1)
+STATE_DIAL_PAUSE = const(STATE_MASK_DIAL | 0x2)
 
 ###############################################################################
 
@@ -64,14 +64,16 @@ class TTY:
         _._tick = 0
         _._tickCounter = 0
         _._state = STATE_OFF
+        _._modeBM = 0
+        _._TN = None
 
         # Pins
 
-        _._pinRx = Pin(rx, Pin.IN, Pin.PULL_UP)
-        _._pinTx = Pin(tx, Pin.OUT, value=1)
-        _._pinVal = 1
-        _._rxInvert = 1 if rxInvert else 0
+        _._rxInvert = 1 if rxInvert else 0   # be sure that value is 0/1 not False/True for XOR
         _._txInvert = 1 if txInvert else 0
+        _._pinRx = Pin(rx, Pin.IN, Pin.PULL_UP)
+        _._pinTx = Pin(tx, Pin.OUT, value=1 ^ _._txInvert)
+        _._setPinValueTX(1)
 
         # timer for cyclic handler call
         _._timer = Timer(-1)
@@ -114,7 +116,7 @@ class TTY:
         t += slice * 1.5
         _._txEndT = int(t + 0.5)
         _._txData = 21
-        #_._txDataBuffer = [21, 10, 0]
+        #_._txDataBuffer = [21, 10, 0]   #debug
         _._txDataBuffer = []
 
         #  dial
@@ -141,6 +143,13 @@ class TTY:
         del _._pinTx
         _._rxDataBuffer = None
         _._txDataBuffer = None
+
+    # -----
+
+    def __repr__(_):
+        return '<TTY class, st={}>'.format(
+            _.getStateStr()
+            )
 
     # =====
 
@@ -169,8 +178,7 @@ class TTY:
 
     def _setPinValueTX(_, val:int) -> None:
 
-        _._pinVal = val ^ _._txInvert
-        _._pinTx.value(val)
+        _._pinTx.value(val ^ _._txInvert)
 
     # =====
 
@@ -267,7 +275,8 @@ class TTY:
         elif _._state == STATE_RX:
             valRX = _._getPinValueRX()
             if _._tick == 1:
-              print('R', end='')
+                pass
+                #  print('R', end='')   #debug
             elif _._tick == _._checkStartT:
                 # check for valid start bit
                 if valRX:
@@ -317,14 +326,20 @@ class TTY:
                 _._setPinValueTX(0)
                 _._setState(STATE_TX)
 
-        #print(_._pinVal, end='')
-
         pass
 
     # =====
 
     def write(_, codes: list):
-        _._txDataBuffer += codes
+        for code in codes:
+            if code == 0x1F:
+                _._modeBM = 0
+            elif code == 0x1B:
+                _._modeBM = 1
+            elif code == 0x09 and _._modeBM == 1 and _._TN:   # WRU?, WerDa?
+                _._rxDataBuffer += _._TN
+                continue
+            _._txDataBuffer.append(code)
 
     # -----
 
@@ -346,18 +361,22 @@ class TTY:
 
     # -----
 
-'''
-class Test:
-    def __init__(_):
-        _.test = 'test'
+    def getStateStr(_) -> str:
+        return '{}{}:{}'.format(
+            hex(_._state)[2:],
+            '#' if _._dialMode else '',
+            _._getPinValueRX()
+            )
 
-    def run(_):
-        print(_.test)
+    # =====
+
+    def setTN(self, TN:list) -> None:
+        self._TN = TN
+
+    # -----
+
+    def getTN(self) -> list:
+        return self._TN
 
 
-t = TTY()
-for i in range(200):
-    t.timerHandler()
-pass
-'''
-
+###############################################################################
