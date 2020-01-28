@@ -1,26 +1,26 @@
-
 #!python3
 """
 Communication with historic teletype (TTY, german: Fernschreiber) on chip ESP8266 or ESP32
 
 Default ESP8266 Pinout on Board 'Wemos D1 mini (pro)':
-TX      D3  GPIO 0 (with pullup, boot, board Button)
-RX      D2  GPIO 4
-Relay   D1  GPIO 5 (high active)
+TX      D1  GPIO 5
+RX      D3  GPIO 0 (internal pullup, boot, (board Button))
+RLY     D2  GPIO 4 (high active)
 LED     D4  GPIO 2 (low active, board LED to Vcc)
-Free    D0, D5...D8, A0
+ONS     D0  GPIO 16 (NO internal pulldown)
+Free    D5...D8, A0
 
 Default ESP32 Pinout on Board 'NodeMCU-32S':
-TX      GPIO 0 (with pullup, boot, board Button)
-RX      GPIO 5
-Relay   GPIO 4 (high active)
+TX      GPIO 4
+RX      GPIO 0 (internal pullup, boot, board Button)
+RLY     GPIO 12 (high active)
 LED     GPIO 2 (high active, board LED to GND)
-Free    GPIO (9...10), 12...19, 21...27, 32...35, (36, 39)
-NotUse  GPIO 1, 3, 6..8, (9...10), 11, (36, 39)
+Free    GPIO 5, 13...19, 21...27, 32...33, (34, 35, 36, 39 readonly)
+NotUse  GPIO 1, 3, 6...11
 
 Example:
 import telex
-t = telex.Telex(5, 2, 0, 4, 5)
+t = telex.Telex('myconfig.json')
 if t.any():
   c = t.read()
 t.write('RYRYRYRYRY')
@@ -70,8 +70,16 @@ gc.collect()
 ###############################################################################
 
 HELP_TEXT = '''
-Option HELP not licensed!
-Upgrade to PRO version...
+Escape shortcuts:
+<ESC> Q   Quit
+<ESC> A   Power up
+<ESC> Z   Power down
+<ESC> D   Dial mode
+<ESC> T   Text mode
+<ESC> R   'ryry...'
+<ESC> F   'quick brown fox...'
+<ESC> K   'kaufen sie...'
+<ESC> H   This help
 '''
 
 DEFAULT_CONFIG_FILE = 'telex.json'
@@ -109,7 +117,10 @@ class Telex():
             pinLED = Pin(cnfPin['LED_GPIO'], Pin.OUT, value=0)
             _._pwmLED = PWM(pinLED, freq=125, duty=512)
         if 'ONS_GPIO' in cnfPin:
-            _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN, Pin.PULL_UP)
+            try:
+                _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN, Pin.PULL_UP)
+            except:
+                _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN)
             _._swState = 0
             _._swCounter = 0
 
@@ -237,9 +248,11 @@ class Telex():
         elif c == 'T':
             _.dial(False)
         elif c == 'R':
-            _.write('RYRYRYRYRY')
+            _.write('ry'*20)
         elif c == 'F':
-            _.write('THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG')
+            _.write('the quick brown fox jumps over the lazy dog')
+        elif c == 'K':
+            _.write('kaufen sie jede woche vier gute bequeme pelze xy 1234567890')
         elif c == 'H':
             print(HELP_TEXT)
         else:
@@ -279,6 +292,7 @@ class Telex():
         _.write(ascii)
 
 ###############################################################################
+
 
 
 

@@ -5,7 +5,7 @@
     "RXD_GPIO": 0,
     "RLY_GPIO": 4,
     "LED_GPIO": 2,
-    "ONS_GPIO": 15,
+    "ONS_GPIO": 16,
     "TXD_INVERT": true,
     "RXD_INVERT": true
     },

@@ -32,6 +32,11 @@ if MICROPYTHON:
 # import telex module
 import telex
 
+REPLACE = {
+  '\n': '\r\n',
+  '<': '\r',
+  '|': '\n',
+}
 
 def run(cnfName:str=None):
     print('')
@@ -62,10 +67,12 @@ def run(cnfName:str=None):
             # print(events)
 
             for file in events:
-                ch = file[0].read(1)
-                #print('ch', ch)
+                ch = file[0].read(1).lower()
+                #print('ch', ch, type(ch))
                 #print(ord(ch))
+                ch = REPLACE.get(ch, ch)
                 t.write(ch)
+                print(ch, end='')
 
             if t.any():
                 ch = t.read()
@@ -76,3 +83,6 @@ def run(cnfName:str=None):
 
 if __name__ == "__main__":
     run()
+
+
+
