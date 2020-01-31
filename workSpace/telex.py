@@ -66,6 +66,7 @@ from bmcode import BaudotMurrayCode
 gc.collect()
 import json
 gc.collect()
+import io
 
 ###############################################################################
 
@@ -84,9 +85,14 @@ Escape shortcuts:
 
 DEFAULT_CONFIG_FILE = 'telex.json'
 
+MP_STREAM_POLL_RD = const(1)
+MP_STREAM_POLL_WR = const(4)
+MP_STREAM_POLL = const(3)
+MP_STREAM_ERROR = const(-1)
+
 ###############################################################################
 
-class Telex():
+class Telex(io.IOBase):
     def __init__(_, cnfName:str=None):
 
         _._rxCharBuffer = []
@@ -111,44 +117,63 @@ class Telex():
 
         # Pins
         
-        if 'RLY_GPIO' in cnfPin:
-            _._pinRly = Pin(cnfPin['RLY_GPIO'], Pin.OUT, value=0)
+        if 'RLY' in cnfPin:
+            cp = cnfPin['RLY']
+            _._pinRly = Pin(cp['GPIO'], Pin.OUT, value=0)
+            _._invertRly = 1 if cp.get('INVERT', False) else 0
         if 'LED_GPIO' in cnfPin:
-            pinLED = Pin(cnfPin['LED_GPIO'], Pin.OUT, value=0)
+            cp = cnfPin['LED']
+            pinLED = Pin(cp['GPIO'], Pin.OUT, value=0)
             _._pwmLED = PWM(pinLED, freq=125, duty=512)
+            _._invertLED = 1 if cp.get('INVERT', False) else 0
         if 'ONS_GPIO' in cnfPin:
+            cp = cnfPin['ONS']
             try:
-                _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN, Pin.PULL_UP)
-            except:
-                _._pinOnS = Pin(cnfPin['ONS_GPIO'], Pin.IN)
+                _._pinOnS = Pin(cp['GPIO'], Pin.IN, Pin.PULL_UP)
+            except:   # pin 16 of ESP8266 has no pullup
+                _._pinOnS = Pin(cp['GPIO'], Pin.IN)
+            _._invertOnS = 1 if cp.get('INVERT', False) else 0
             _._swState = 0
             _._swCounter = 0
 
         # TTY
         
-        txdInvert = cnfPin.get('TXD_INVERT', False)
-        rxdInvert = cnfPin.get('RXD_INVERT', False)
+        assert('TXD' in cnfPin)
+        cp = cnfPin['TXD']
+        txdGPIO = cp['GPIO']
+        txdInvert = cp.get('INVERT', False)
+        
+        assert('RXD' in cnfPin)
+        cp = cnfPin['RXD']
+        rxdGPIO = cp['GPIO']
+        rxdInvert = cp.get('INVERT', False)
+        
         baud = _.cnf.get('BAUD', 50)
+        
         timer = 2   #TODO default timer dependent on baudrate
         if baud >= 70:
             timer = 1
-        _._tty = TTY(baud, timer, cnfPin['TXD_GPIO'], cnfPin['RXD_GPIO'], txdInvert, rxdInvert)
+        
+        _._tty = TTY(baud, timer, txdGPIO, rxdGPIO, txdInvert, rxdInvert)
 
         if 'TN' in _.cnf and _.cnf['TN']:
             TN = '[\r\n' + _.cnf['TN'] + ']'
             codeTN = _._bm.encodeA2BM(TN)
             _._tty.setTN(codeTN)
-            print(_.cnf['TN'], codeTN)   #debug
+            #print(_.cnf['TN'], codeTN)   #debug
             _._bm.reset()
+
+        _._dialMode = _.cnf.get('DIAL_MODE', _._tty.DIAL_MODE_PULSE)
+        _._tty.setDialMode(_._dialMode)
 
         # public
 
         _.run = True
-        _.keyDial = False
 
     # -----
 
     def __del__(_):
+        print('__del__')
         del _._tty
 
     # -----
@@ -159,21 +184,59 @@ class Telex():
     # -----
 
     def __exit__(_, type, value, tb):
+        print('__exit__')
         if _._tty:
             del _._tty
 
     # -----
 
+    def __iter__(_):
+        return _
+
+    # -----
+
+    def __next__(_):
+        _._syncCharBuffer()
+        if _._rxCharBuffer:
+            return _._rxCharBuffer.pop(0)
+        else:
+            raise StopIteration()
+
+    # -----
+
+    def __call__(_):
+        print('Hello')
+        
+    # -----
+
     def __repr__(_):
-        return "<Telex class '{}', tx={}{}, rx={}{}, baud={}, tty={}>".format(
-            _.cnf['NAME'],
-            _.cnf['PIN']['TXD_GPIO'],
-            'i' if _.cnf['PIN'].get('TXD_INVERT', False) else '',
-            _.cnf['PIN']['RXD_GPIO'],
-            'i' if _.cnf['PIN'].get('RXD_INVERT', False) else '',
-            _.cnf['BAUD'],
-            _._tty.getStateStr()
-            )
+        try:
+            return "<Telex '{}', tx={}{}, rx={}{}, baud={}, tty={}>".format(
+                _.cnf['NAME'],
+                _.cnf['PIN']['TXD']['GPIO'],
+                'i' if _.cnf['PIN']['TXD'].get('INVERT', False) else '',
+                _.cnf['PIN']['RXD']['GPIO'],
+                'i' if _.cnf['PIN']['RXD'].get('INVERT', False) else '',
+                _.cnf['BAUD'],
+                _._tty.getStateStr()
+                )
+        except:
+            return '<Telex>'
+
+    # =====
+
+    def ioctl(_, req, arg):
+        # control stream to be used with select
+        ret = MP_STREAM_ERROR
+        if req == MP_STREAM_POLL:
+            ret = 0
+            if arg & MP_STREAM_POLL_RD:
+                if _._tty.any() or _._rxCharBuffer:
+                    ret |= MP_STREAM_POLL_RD
+            if arg & MP_STREAM_POLL_WR:
+                if True:
+                    ret |= MP_STREAM_POLL_WR
+        return ret
 
     # =====
 
@@ -195,14 +258,14 @@ class Telex():
 
         for a in ascii:
             if a == '\x1B':   # escape char
-                print('<ESC>', end='')
+                _._rxCharBuffer.append('<ESC>')
                 _._escape = not _._escape
                 continue
                 
             if _._escape:
                 _._escape = False
                 _.cmd(a)
-            else:
+            else:   # normal text
                 #print(a.lower(), end='')   #debug
                 bs = _._bm.encodeA2BM(a)
                 if bs:
@@ -217,13 +280,14 @@ class Telex():
 
     # -----
 
-    def read(_) -> str:
+    def read(_, count:int=1) -> str:
         # get a single translated char or escape sequence as string
         _._syncCharBuffer()
-        if _._rxCharBuffer:
-            return _._rxCharBuffer.pop(0)
-        else:
-            return ''
+        ret = ''
+        while _._rxCharBuffer and count > 0:
+            ret += _._rxCharBuffer.pop(0)
+            count -= 1
+        return ret
 
     # =====
 
@@ -254,41 +318,38 @@ class Telex():
         elif c == 'K':
             _.write('kaufen sie jede woche vier gute bequeme pelze xy 1234567890')
         elif c == 'H':
-            print(HELP_TEXT)
+            _._rxCharBuffer.append(HELP_TEXT)
         else:
             c = '?'
-        print('{' + c + '}', end='')
+        _._rxCharBuffer.append('{' + c + '}')
 
     # -----
 
     def power(_, enable:bool) -> None:
         if _._pinRly:
             #TODO ignore inputs for 1 sec
-            _._pinRly.value(enable)
+            _._pinRly.value(enable ^ _._invertRly)
 
     # -----
 
     def dial(_, enable:bool) -> None:
-        pulseDial = _.cnf.get('PULSE_DIAL', False)
-        if pulseDial:
-            _._tty.dial(enable)
-        else:
-            _.keyDial = enable
-            if _.keyDial:
-                _.power(True)
+        _._tty.dial(enable)
+        if enable and _._dialMode == _._tty.DIAL_MODE_KEY:
+            _.power(True)
+
 
     # -----
 
     @property
-    def t(_) -> str:
+    def char(_) -> str:
         ret = ''
         _._syncCharBuffer()
         while _._rxCharBuffer:
             ret += _._rxCharBuffer.pop(0)
         return ret
 
-    @t.setter
-    def t(_, ascii:str):
+    @char.setter
+    def char(_, ascii:str):
         _.write(ascii)
 
 ###############################################################################

@@ -1,14 +1,13 @@
 {
   "NAME": "ESP8266 on Wemos D1 mini DEBUG",
   "PIN": {
-    "TXD_GPIO": 2,
-    "RXD_GPIO": 0,
-    "RLY_GPIO": 4,
-    "LED_GPIO": 5,
-    "TXD_INVERT": true
+    "TXD": { "GPIO": 2, "INVERT": true },
+    "RXD": { "GPIO": 0, "INVERT": true },
+    "RLY": { "GPIO": 4, "INVERT": false },
+    "LED": { "GPIO": 5, "INVERT": true },
+    "ONS": { "GPIO": 16, "INVERT": false }
     },
   "BAUD": 5,
-  "PULSE_DIAL": true,
+  "DIAL_MODE": 0,
   "TN": "12345 abc d"
 }
-

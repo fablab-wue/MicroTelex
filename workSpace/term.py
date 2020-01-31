@@ -31,6 +31,7 @@ if MICROPYTHON:
 
 # import telex module
 import telex
+gc.collect()
 
 REPLACE = {
   '\n': '\r\n',
@@ -52,37 +53,38 @@ def run(cnfName:str=None):
     print('Implementation:  ', sys.implementation)
     print('Free Memory:     ', gc.mem_free())
 
-    with telex.Telex(cnfName) as t:
-        print('Config:          ', t.cnf)
+    with telex.Telex(cnfName) as tlx:
+        #print('Config:          ', tlx.cnf)
+        print('Config Name:     ', tlx.cnf['NAME'])
         print('')
 
         # polling from stdin
-        poller = select.poll()
-        poller.register(sys.stdin, select.POLLIN)
+        #TEST poller = select.poll()
+        #TEST poller.register(sys.stdin, select.POLLIN)
 
-        while t.run:
+        while tlx.run:
             # wait till character from stdin or timeout
-            events = poller.poll(50)
-            #events, x, y = select.select([sys.stdin], [], [], 0.075)
-            # print(events)
+            #TEST events = poller.poll(50)
+            #TEST print(events)
+            readables, writables, exceptionals = select.select([sys.stdin, tlx], [], [], 0.5)
 
-            for file in events:
-                ch = file[0].read(1).lower()
-                #print('ch', ch, type(ch))
-                #print(ord(ch))
-                ch = REPLACE.get(ch, ch)
-                t.write(ch)
-                print(ch, end='')
+            for readable in readables:
+                a = readable.read(1)
+                if a:
+                    #print('a', a, type(a))
+                    #print(ord(a))
+                    if readable == tlx:   # from teletype
+                        print(a, end='')
+                    else:   # from user
+                        a = a.lower()
+                        a = REPLACE.get(a, a)
+                        print(a, end='')
+                        tlx.write(a)
 
-            if t.any():
-                ch = t.read()
-                print(ch, end='')
-
-        pass
+        print('EXIT')
 
 
 if __name__ == "__main__":
     run()
 
-
-
+run()

@@ -53,10 +53,15 @@ STATE_DIAL_WAIT = const(STATE_MASK_DIAL | 0x0)
 STATE_DIAL_PULSE = const(STATE_MASK_DIAL | 0x1)
 STATE_DIAL_PAUSE = const(STATE_MASK_DIAL | 0x2)
 
+BMC_DIAL_DIGITS = (22, 23, 19, 1, 10, 16, 21, 7, 6, 24)
+
 ###############################################################################
 
 
 class TTY:
+    DIAL_MODE_PULSE = 0
+    DIAL_MODE_KEY = 1
+
     def __init__(_, baud:float = 50, timer:int = 5, tx:int = 2, rx:int = 0, txInvert:bool=False, rxInvert:bool=False):
 
         # state machine
@@ -121,8 +126,9 @@ class TTY:
 
         #  dial
 
+        _._dialMode = _.DIAL_MODE_PULSE
         _._dialEndT = 200 // timer   # ticks for dial a digit end - 200ms
-        _._dialMode = False
+        _._dialActive = False
         _._dialCounter = 0
 
         # TIMER
@@ -147,7 +153,7 @@ class TTY:
     # -----
 
     def __repr__(_):
-        return '<TTY class, st={}>'.format(
+        return '<TTY, st={}>'.format(
             _.getStateStr()
             )
 
@@ -195,7 +201,7 @@ class TTY:
             if _._state == STATE_DIAL_WAIT:
                 if valRX:
                     _._tickCounter = 0
-                    if not _._dialMode:
+                    if not _._dialActive:
                         _._setState(STATE_LISTEN)
                 else:
                     _._tickCounter += 1
@@ -212,7 +218,7 @@ class TTY:
                     _._tickCounter = 0
                     if _._tick == _._len1secT:
                         _._rxDataBuffer.append(0xED)  # signal dial error
-                        _._dialMode = False
+                        _._dialActive = False
                         _._setState(STATE_LISTEN)
             elif _._state == STATE_DIAL_PAUSE:
                 if valRX:
@@ -236,13 +242,13 @@ class TTY:
                 if valRX:
                     if _._tick == _._len1charT:
                         _._setState(STATE_LISTEN_CAN_TX)
-                        if _._dialMode:
+                        if _._dialActive and _._dialMode == _.DIAL_MODE_PULSE:
                             _._setState(STATE_DIAL_WAIT)
                 else:
                     _._setState(STATE_RX)
             elif _._state == STATE_LISTEN_CAN_TX:
                 if valRX:
-                    if _._dialMode:
+                    if _._dialActive and _._dialMode == _.DIAL_MODE_PULSE:
                         _._setState(STATE_DIAL_WAIT)
                 else:
                     _._setState(STATE_RX)
@@ -295,7 +301,12 @@ class TTY:
                 # check for valid stop bit
                 if valRX:
                     # correct stop bit -> send rx data
-                    _._rxDataBuffer.append(_._rxData)
+                    if _._dialActive:
+                        if _._rxData in BMC_DIAL_DIGITS:
+                            n = BMC_DIAL_DIGITS.index(_._rxData)
+                            _._rxDataBuffer.append(0xD0 + n)
+                    else:
+                        _._rxDataBuffer.append(_._rxData)
                     _._setState(STATE_LISTEN)
                 else:
                     # line is down, may be off-mode
@@ -357,26 +368,35 @@ class TTY:
     # -----
 
     def dial(_, enable:bool) -> None:
-        _._dialMode = enable
+        _._dialActive = enable
 
     # -----
 
     def getStateStr(_) -> str:
         return '{}{}:{}'.format(
             hex(_._state)[2:],
-            '#' if _._dialMode else '',
+            '#' if _._dialActive else '',
             _._getPinValueRX()
             )
 
     # =====
 
-    def setTN(self, TN:list) -> None:
-        self._TN = TN
+    def setTN(_, TN:list) -> None:
+        _._TN = TN
 
     # -----
 
-    def getTN(self) -> list:
-        return self._TN
+    def getTN(_) -> list:
+        return _._TN
 
+    # =====
+
+    def setDialMode(_, mode:int) -> None:
+        _._dialMode = mode
+
+    # -----
+
+    def getDialMode(_) -> int:
+        return _._dialMode
 
 ###############################################################################
