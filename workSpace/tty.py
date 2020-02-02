@@ -69,8 +69,6 @@ class TTY:
         _._tick = 0
         _._tickCounter = 0
         _._state = STATE_OFF
-        _._modeBM = 0
-        _._TN = None
 
         # Pins
 
@@ -268,6 +266,9 @@ class TTY:
         # TX
 
         elif _._state == STATE_TX:
+            #TODO handle break
+            if _._txData >= 32:
+                pass
             if _._tick in _._txDataTs:
                 _._setPinValueTX(_._txData & 1)
                 _._txData >>= 1
@@ -341,16 +342,8 @@ class TTY:
 
     # =====
 
-    def write(_, codes: list):
-        for code in codes:
-            if code == 0x1F:
-                _._modeBM = 0
-            elif code == 0x1B:
-                _._modeBM = 1
-            elif code == 0x09 and _._modeBM == 1 and _._TN:   # WRU?, WerDa?
-                _._rxDataBuffer += _._TN
-                continue
-            _._txDataBuffer.append(code)
+    def write(_, codes: list) -> None:
+        _._txDataBuffer += codes
 
     # -----
 
@@ -359,16 +352,27 @@ class TTY:
 
     # -----
 
-    def read(_, len: int = -1) -> int:
-        if _._rxDataBuffer:
-            return [_._rxDataBuffer.pop(0)]
-        else:
-            return []
+    def read(_, count:int=1) -> list:
+        ret = []
+        while _._rxDataBuffer and count > 0:
+            ret.append(_._rxDataBuffer.pop(0))
+            count -= 1
+        return ret
+
+    # -----
+
+    def readAdd(_, codes:list) -> None:
+        _._rxDataBuffer += codes
 
     # -----
 
     def dial(_, enable:bool) -> None:
         _._dialActive = enable
+
+    # -----
+
+    def writeBreak(_) -> None:
+        pass  #TODO implement break
 
     # -----
 
@@ -378,16 +382,6 @@ class TTY:
             '#' if _._dialActive else '',
             _._getPinValueRX()
             )
-
-    # =====
-
-    def setTN(_, TN:list) -> None:
-        _._TN = TN
-
-    # -----
-
-    def getTN(_) -> list:
-        return _._TN
 
     # =====
 

@@ -95,6 +95,7 @@ MP_STREAM_ERROR = const(-1)
 class Telex(io.IOBase):
     def __init__(_, cnfName:str=None):
 
+        _._cnfName = cnfName
         _._rxCharBuffer = []
         _._escape = False
 
@@ -114,6 +115,7 @@ class Telex(io.IOBase):
         # coder from BaudotMurrayCode to ASCII
         
         _._bm = BaudotMurrayCode()
+        _._modeBM = 0
 
         # Pins
         
@@ -159,7 +161,8 @@ class Telex(io.IOBase):
         if 'TN' in _.cnf and _.cnf['TN']:
             TN = '[\r\n' + _.cnf['TN'] + ']'
             codeTN = _._bm.encodeA2BM(TN)
-            _._tty.setTN(codeTN)
+            #_._tty.setTN(codeTN)
+            _._TN = codeTN
             #print(_.cnf['TN'], codeTN)   #debug
             _._bm.reset()
 
@@ -245,7 +248,7 @@ class Telex(io.IOBase):
             return
 
         while _._tty.any():
-            bs = _._tty.read()
+            bs = _.readCode()
             a = _._bm.decodeBM2A(bs)
             if a:
                 _._rxCharBuffer.append(a)
@@ -269,7 +272,7 @@ class Telex(io.IOBase):
                 #print(a.lower(), end='')   #debug
                 bs = _._bm.encodeA2BM(a)
                 if bs:
-                    _._tty.write(bs)
+                    _.writeCode(bs)
 
     # -----
 
@@ -288,6 +291,35 @@ class Telex(io.IOBase):
             ret += _._rxCharBuffer.pop(0)
             count -= 1
         return ret
+
+    # -----
+
+    def writeCode(_, codes: list) -> None:
+        for code in codes:
+            if code == 0x1F:   # LTRS
+                _._modeBM = 0
+            elif code == 0x1B:   # FIGS
+                _._modeBM = 1
+            elif code == 0x09 and _._modeBM == 1 and _._TN:   # WRU?, WerDa?
+                _._tty.readAdd(_._TN)
+                continue
+            _._tty.write([code])
+
+    # -----
+
+    def anyCode(_) -> int:
+        return _._tty.any()
+
+    # -----
+
+    def readCode(_, count:int=1) -> list:
+        codes = _._tty.read(count)
+        for code in codes:
+            if code == 0x1F:   # LTRS
+                _._modeBM = 0
+            elif code == 0x1B:   # FIGS
+                _._modeBM = 1
+        return codes
 
     # =====
 
