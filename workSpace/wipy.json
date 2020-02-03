@@ -1,0 +1,10 @@
+{
+  "NAME": "ESP32 on PyCom WiPy / LoPy",
+  "PIN": {
+    "TXD": { "GPIO": "G16", "INVERT": false },
+    "RXD": { "GPIO": "G17", "INVERT": false },
+    },
+  "BAUD": 50,
+  "DIAL_MODE": 0,
+  "TN": "12345 abc d"
+}

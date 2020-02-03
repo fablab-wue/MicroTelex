@@ -46,6 +46,7 @@ if MICROPYTHON:
     from machine import Pin
     from machine import PWM
     gc.collect()
+    import uio as io
 
 else:  # CPython
     #import os
@@ -55,6 +56,7 @@ else:  # CPython
     import gc
     from debug_pc.machine import Pin
     from debug_pc.machine import PWM
+    import io
 
     def const(x):
         return x
@@ -66,7 +68,6 @@ from bmcode import BaudotMurrayCode
 gc.collect()
 import json
 gc.collect()
-import io
 
 ###############################################################################
 

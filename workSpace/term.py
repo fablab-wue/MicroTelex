@@ -46,7 +46,6 @@ def run(cnfName:str=None):
     print(r"  /  |/  (_)__________/_  __/__ / /____ __")
     print(r" / /|_/ / / __/ __/ _ \/ / / -_) / -_) \ /")
     print(r"/_/  /_/_/\__/_/  \___/_/  \__/_/\__/_\_\ ")
-    print(r"                                          ")
     print('')
     print('Platform:        ', sys.platform)
     print('Version:         ', sys.version)
@@ -56,7 +55,8 @@ def run(cnfName:str=None):
     with telex.Telex(cnfName) as tlx:
         #print('Config:          ', tlx.cnf)
         print('Config Name:     ', tlx.cnf['NAME'])
-        print('')
+        #print('')
+        print('='*42)
 
         # polling from stdin
         #TEST poller = select.poll()
@@ -81,10 +81,17 @@ def run(cnfName:str=None):
                         print(a, end='')
                         tlx.write(a)
 
-        print('EXIT')
+        print('\r\nEXIT')
 
 
 if __name__ == "__main__":
     run()
 
-run()
+# helper class to use "utx" in repl
+# >>>from term import *
+# >>>utx
+class UTX:
+    def __repr__(self):
+        return run()
+
+utx = UTX()
