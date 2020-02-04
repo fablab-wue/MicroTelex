@@ -1,13 +1,47 @@
-import wifimgr
+import network
+import time
+import uasyncio as asyncio
+import machine
+import gc
 
+from wifi_manager import WifiManager
+WifiManager.setup_network()
+#WifiManager.start_managing()
 
-#wlan = wifimgr.get_connection()
-if wlan is None:
-    print("Could not initialize the network connection.")
-    while True:
-        pass  # you shall not pass :D
+'''
+SSID = "<your-SSID>"
+PWD = "<your-password>"
 
+print('Connecting to WiFi "{}"'.format(SSID))
 
-# Main Code goes here, wlan is a working network.WLAN(STA_IF) instance.
-print("ESP OK")
+sta_if = network.WLAN(network.STA_IF)
+sta_if.active(True)
+sta_if.connect(SSID, PWD) # Connect to an AP
 
+while not sta_if.isconnected():  # Check for successful connection
+    print(".", end='')
+    time.sleep(1)
+
+print("")
+print(sta_if.ifconfig())
+
+'''
+
+print("ESP READY")
+
+import tty
+import telex
+from term import *
+try:
+    from upysh import *
+except:
+    pass
+
+import ntptime
+ntptime.settime()
+
+rtc = machine.RTC()
+print('Date Time:', rtc.datetime())
+
+gc.collect()
+print('Free MEM:', gc.mem_free())

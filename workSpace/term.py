@@ -46,7 +46,6 @@ def run(cnfName:str=None):
     print(r"  /  |/  (_)__________/_  __/__ / /____ __")
     print(r" / /|_/ / / __/ __/ _ \/ / / -_) / -_) \ /")
     print(r"/_/  /_/_/\__/_/  \___/_/  \__/_/\__/_\_\ ")
-    print(r"                                          ")
     print('')
     print('Platform:        ', sys.platform)
     print('Version:         ', sys.version)
@@ -56,35 +55,51 @@ def run(cnfName:str=None):
     with telex.Telex(cnfName) as tlx:
         #print('Config:          ', tlx.cnf)
         print('Config Name:     ', tlx.cnf['NAME'])
-        print('')
+        #print('')
+        print('='*42)
 
         # polling from stdin
         #TEST poller = select.poll()
         #TEST poller.register(sys.stdin, select.POLLIN)
 
-        while tlx.run:
-            # wait till character from stdin or timeout
-            #TEST events = poller.poll(50)
-            #TEST print(events)
-            readables, writables, exceptionals = select.select([sys.stdin, tlx], [], [], 0.5)
+        try:
+            while tlx.run:
+                # wait till character from stdin or timeout
+                #TEST events = poller.poll(50)
+                #TEST print(events)
+                readables, writables, exceptionals = select.select([sys.stdin, tlx], [], [], 0.5)
 
-            for readable in readables:
-                a = readable.read(1)
-                if a:
-                    #print('a', a, type(a))
-                    #print(ord(a))
-                    if readable == tlx:   # from teletype
-                        print(a, end='')
-                    else:   # from user
-                        a = a.lower()
-                        a = REPLACE.get(a, a)
-                        print(a, end='')
-                        tlx.write(a)
+                for readable in readables:
+                    a = readable.read(1)
+                    if a:
+                        #print('a', a, type(a))
+                        #print(ord(a))
+                        if readable == tlx:   # from teletype
+                            print(a, end='')
+                        else:   # from user
+                            a = a.lower()
+                            a = REPLACE.get(a, a)
+                            print(a, end='')
+                            tlx.write(a)
 
-        print('EXIT')
+        except KeyboardInterrupt :
+            pass
+
+        print('\r\nEXIT')
 
 
 if __name__ == "__main__":
     run()
 
-run()
+# helper class to use "utx" in repl
+# >>>from term import *
+# >>>utx
+# >>>utx('myconfig.json')
+class UTX:
+    def __repr__(self):
+        return run()
+
+    def __call__(self, cnfName:str=None):
+        return run(cnfName)
+
+utx = UTX()
