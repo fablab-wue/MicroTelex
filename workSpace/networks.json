@@ -1,4 +1,5 @@
 {
+	"schema": 2,
 	"known_networks": [
 		{
 			"ssid": "your-SSID",
@@ -7,11 +8,13 @@
 		}
 	],
 	"access_point": {
-		"essid": "Micropython-Dev",
-		"channel": 11,
-		"hidden": false,
-		"password": "topsecret",
+		"config": {
+			"essid": "MicroTelex",
+			"channel": 11,
+			"hidden": false,
+			"password": "topsecret"
+		},
 		"enables_webrepl": true,
-        "start_policy": "fallback"
+		"start_policy": "fallback"
 	}
 }
