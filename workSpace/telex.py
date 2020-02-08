@@ -68,6 +68,7 @@ from bmcode import BaudotMurrayCode
 gc.collect()
 import json
 gc.collect()
+from statusLED import StatusLED
 
 ###############################################################################
 
@@ -100,6 +101,11 @@ class Telex(io.IOBase):
         _._rxCharBuffer = []
         _._escape = False
 
+        # coder from BaudotMurrayCode to ASCII
+        
+        _._bm = BaudotMurrayCode()
+        _._modeBM = 0
+
         # config file
 
         if cnfName is None:
@@ -113,51 +119,25 @@ class Telex(io.IOBase):
 
         cnfPin = _.cnf['PIN']
 
-        # coder from BaudotMurrayCode to ASCII
-        
-        _._bm = BaudotMurrayCode()
-        _._modeBM = 0
-
-        # Pins
-        
-        if 'RLY' in cnfPin:
-            cp = cnfPin['RLY']
-            _._pinRly = Pin(cp['GPIO'], Pin.OUT, value=0)
-            _._invertRly = 1 if cp.get('INVERT', False) else 0
-        if 'LED_GPIO' in cnfPin:
-            cp = cnfPin['LED']
-            pinLED = Pin(cp['GPIO'], Pin.OUT, value=0)
-            _._pwmLED = PWM(pinLED, freq=125, duty=512)
-            _._invertLED = 1 if cp.get('INVERT', False) else 0
-        if 'ONS_GPIO' in cnfPin:
-            cp = cnfPin['ONS']
-            try:
-                _._pinOnS = Pin(cp['GPIO'], Pin.IN, Pin.PULL_UP)
-            except:   # pin 16 of ESP8266 has no pullup
-                _._pinOnS = Pin(cp['GPIO'], Pin.IN)
-            _._invertOnS = 1 if cp.get('INVERT', False) else 0
-            _._swState = 0
-            _._swCounter = 0
-
         # TTY
         
-        assert('TXD' in cnfPin)
-        cp = cnfPin['TXD']
-        txdGPIO = cp['GPIO']
-        txdInvert = cp.get('INVERT', False)
+        assert('TTY_TX' in cnfPin)
+        cp = cnfPin['TTY_TX']
+        ttyTxGPIO = cp['GPIO']
+        ttyTxInvert = cp.get('INVERT', False)
         
-        assert('RXD' in cnfPin)
-        cp = cnfPin['RXD']
-        rxdGPIO = cp['GPIO']
-        rxdInvert = cp.get('INVERT', False)
+        assert('TTY_RX' in cnfPin)
+        cp = cnfPin['TTY_RX']
+        ttyRxGPIO = cp['GPIO']
+        ttyRxInvert = cp.get('INVERT', False)
         
-        baud = _.cnf.get('BAUD', 50)
+        ttyBaud = _.cnf.get('TTY_BAUD', 50)
         
-        timer = 2   #TODO default timer dependent on baudrate
-        if baud >= 70:
-            timer = 1
+        ttyPeriod = 2   #TODO default timer dependent on baudrate
+        if ttyBaud >= 70:
+            ttyPeriod = 1
         
-        _._tty = TTY(baud, timer, txdGPIO, rxdGPIO, txdInvert, rxdInvert)
+        _._tty = TTY(ttyBaud, ttyPeriod, ttyTxGPIO, ttyRxGPIO, ttyTxInvert, ttyRxInvert)
 
         if 'TN' in _.cnf and _.cnf['TN']:
             TN = '[\r\n' + _.cnf['TN'] + ']'
@@ -170,6 +150,33 @@ class Telex(io.IOBase):
         _._dialMode = _.cnf.get('DIAL_MODE', _._tty.DIAL_MODE_PULSE)
         _._tty.setDialMode(_._dialMode)
 
+        # Pins
+
+        if 'LED_ST' in cnfPin:
+            cp = cnfPin['LED_ST']
+            ledStGPIO = cp['GPIO']
+            ledStInvert = 1 if cp.get('INVERT', False) else 0
+            _._ledSt = StatusLED(ledStGPIO, ledStInvert)
+            print(_._tty._timer)
+        if 'PWR_ON' in cnfPin:
+            cp = cnfPin['PWR_ON']
+            _._pwrOnPin = Pin(cp['GPIO'], Pin.OUT, value=0)
+            _._pwrOnInvert = 1 if cp.get('INVERT', False) else 0
+        if 'LED_XX' in cnfPin:
+            cp = cnfPin['LED_XX']
+            xxxxxPin = Pin(cp['GPIO'], Pin.OUT, value=0)
+            _._xxxxxPWM = PWM(xxxxxPin, freq=125, duty=512)
+            _._xxxxxInvert = 1 if cp.get('INVERT', False) else 0
+        if 'SW_LIN' in cnfPin:
+            cp = cnfPin['SW_LIN']
+            try:
+                _._swLinPin = Pin(cp['GPIO'], Pin.IN, Pin.PULL_UP)
+            except:   # pin 16 of ESP8266 has no pullup
+                _._swLinPin = Pin(cp['GPIO'], Pin.IN)
+            _._swLinInvert = 1 if cp.get('INVERT', False) else 0
+            _._swLinState = 0
+            _._swLinCounter = 0
+
         # public
 
         _.run = True
@@ -179,6 +186,9 @@ class Telex(io.IOBase):
     def __del__(_):
         print('__del__')
         del _._tty
+        if _._ledSt:
+            del _._ledSt
+
 
     # -----
 
@@ -191,6 +201,9 @@ class Telex(io.IOBase):
         print('__exit__')
         if _._tty:
             del _._tty
+        if _._ledSt:
+            _._ledSt.attractor(0)
+            _._ledSt.deinit()
 
     # -----
 
@@ -305,6 +318,8 @@ class Telex(io.IOBase):
                 _._tty.readAdd(_._TN)
                 continue
             _._tty.write([code])
+            if _._ledSt:
+                _._ledSt.add(8)
 
     # -----
 
@@ -320,6 +335,9 @@ class Telex(io.IOBase):
                 _._modeBM = 0
             elif code == 0x1B:   # FIGS
                 _._modeBM = 1
+            if _._ledSt:
+                _._ledSt.add(-8)
+
         return codes
 
     # =====
@@ -359,9 +377,12 @@ class Telex(io.IOBase):
     # -----
 
     def power(_, enable:bool) -> None:
-        if _._pinRly:
+        if _._pwrOnPin:
             #TODO ignore inputs for 1 sec
-            _._pinRly.value(enable ^ _._invertRly)
+            _._pwrOnPin.value(enable ^ _._pwrOnInvert)
+            if _._ledSt:
+                atr = 24 if enable else 8
+                _._ledSt.attractor(atr)
 
     # -----
 

@@ -62,7 +62,7 @@ class TTY:
     DIAL_MODE_PULSE = 0
     DIAL_MODE_KEY = 1
 
-    def __init__(_, baud:float = 50, timer:int = 5, tx:int = 2, rx:int = 0, txInvert:bool=False, rxInvert:bool=False):
+    def __init__(_, baud:float = 50, period:int = 5, tx:int = 2, rx:int = 0, txInvert:bool=False, rxInvert:bool=False):
 
         # state machine
 
@@ -79,17 +79,17 @@ class TTY:
         _._setPinValueTX(1)
 
         # timer for cyclic handler call
-        _._timer = Timer(-1)
+        _._timer = Timer(1)
 
-        _.init(baud, timer)
+        _.init(baud, period)
 
     # -----
 
-    def init(_, baud:float = 50, timer:int = 5):
-        slice = (1000. / timer) / baud
+    def init(_, baud:float = 50, period:int = 5):
+        slice = (1000. / period) / baud
 
         _._len1charT = int(slice*7.5 + 0.5)
-        _._len1secT = 1000 // timer
+        _._len1secT = 1000 // period
 
         # rx
 
@@ -125,13 +125,13 @@ class TTY:
         #  dial
 
         _._dialMode = _.DIAL_MODE_PULSE
-        _._dialEndT = 200 // timer   # ticks for dial a digit end - 200ms
+        _._dialEndT = 200 // period   # ticks for dial a digit end - 200ms
         _._dialActive = False
         _._dialCounter = 0
 
         # TIMER
 
-        _._timer.init(period=timer, mode=Timer.PERIODIC, callback=_._timerHandler)
+        _._timer.init(period=period, mode=Timer.PERIODIC, callback=_._timerHandler)
 
     # -----
 
