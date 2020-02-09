@@ -25,22 +25,19 @@ if t.any():
   c = t.read()
 t.write('RYRYRYRYRY')
 """
-__author__ = "Jochen Krapf"
-__email__ = "jk@nerd2nerd.org"
-__copyright__ = "Copyright 2020, JK"
-__license__ = "GPL3"
-__version__ = "0.0.1"
 
 try:  # try MicroPython
     import uos as os
     MICROPYTHON = True
 except:  # CPython
     MICROPYTHON = False
+    __author__ = "Jochen Krapf"
+    __email__ = "jk@nerd2nerd.org"
+    __copyright__ = "Copyright 2020, JK"
+    __license__ = "GPL3"
+    __version__ = "0.0.1"
 
 if MICROPYTHON:
-    #import ujson as json
-    #from _thread import allocate_lock as RLock
-
     import gc
     gc.collect()
     from machine import Pin
@@ -49,10 +46,6 @@ if MICROPYTHON:
     import uio as io
 
 else:  # CPython
-    #import os
-    #import json
-    #from threading import RLock
-
     import gc
     from debug_pc.machine import Pin
     from debug_pc.machine import PWM
@@ -61,14 +54,11 @@ else:  # CPython
     def const(x):
         return x
 
-gc.collect()
 from tty import TTY
-gc.collect()
 from bmcode import BaudotMurrayCode
-gc.collect()
 import json
-gc.collect()
 from statusLED import StatusLED
+gc.collect()
 
 ###############################################################################
 
@@ -83,6 +73,12 @@ Escape shortcuts:
 <ESC> F   'quick brown fox...'
 <ESC> K   'kaufen sie...'
 <ESC> H   This help
+Control characters:
+~   Null
+%   Bell
+[   LTRS
+]   FIGS
+@   WRU
 '''
 
 DEFAULT_CONFIG_FILE = 'telex.json'
@@ -119,6 +115,8 @@ class Telex(io.IOBase):
 
         cnfPin = _.cnf['PIN']
 
+        _.verbose = _.cnf.get('VERBOSE', False)
+
         # TTY
         
         assert('TTY_TX' in cnfPin)
@@ -139,12 +137,9 @@ class Telex(io.IOBase):
         
         _._tty = TTY(ttyBaud, ttyPeriod, ttyTxGPIO, ttyRxGPIO, ttyTxInvert, ttyRxInvert)
 
-        if 'TN' in _.cnf and _.cnf['TN']:
-            TN = '[\r\n' + _.cnf['TN'] + ']'
-            codeTN = _._bm.encodeA2BM(TN)
-            #_._tty.setTN(codeTN)
-            _._TN = codeTN
-            #print(_.cnf['TN'], codeTN)   #debug
+        if 'FAKE_TN' in _.cnf and _.cnf['FAKE_TN']:
+            TN = '[\r\n' + _.cnf['FAKE_TN'] + ']'
+            _._TN = _._bm.encodeA2BM(TN)
             _._bm.reset()
 
         _._dialMode = _.cnf.get('DIAL_MODE', _._tty.DIAL_MODE_PULSE)
@@ -157,16 +152,15 @@ class Telex(io.IOBase):
             ledStGPIO = cp['GPIO']
             ledStInvert = 1 if cp.get('INVERT', False) else 0
             _._ledSt = StatusLED(ledStGPIO, ledStInvert)
-            print(_._tty._timer)
         if 'PWR_ON' in cnfPin:
             cp = cnfPin['PWR_ON']
             _._pwrOnPin = Pin(cp['GPIO'], Pin.OUT, value=0)
             _._pwrOnInvert = 1 if cp.get('INVERT', False) else 0
         if 'LED_XX' in cnfPin:
             cp = cnfPin['LED_XX']
-            xxxxxPin = Pin(cp['GPIO'], Pin.OUT, value=0)
-            _._xxxxxPWM = PWM(xxxxxPin, freq=125, duty=512)
-            _._xxxxxInvert = 1 if cp.get('INVERT', False) else 0
+            ledXxPin = Pin(cp['GPIO'], Pin.OUT, value=0)
+            _._ledXxPWM = PWM(ledXxPin, freq=125, duty=512)
+            _._ledXxInvert = 1 if cp.get('INVERT', False) else 0
         if 'SW_LIN' in cnfPin:
             cp = cnfPin['SW_LIN']
             try:
@@ -176,6 +170,7 @@ class Telex(io.IOBase):
             _._swLinInvert = 1 if cp.get('INVERT', False) else 0
             _._swLinState = 0
             _._swLinCounter = 0
+            #TODO implement button/switch class
 
         # public
 
@@ -183,12 +178,21 @@ class Telex(io.IOBase):
 
     # -----
 
-    def __del__(_):
-        print('__del__')
-        del _._tty
+    def deinit(_):
+        print('__Telex_deinit__')   #debug
+        if _._tty:
+            _._tty.deinit()
+            del _._tty
         if _._ledSt:
+            _._ledSt.attractor(0)
+            _._ledSt.deinit()
             del _._ledSt
 
+    # -----
+
+    def __del__(_):
+        print('__Telex_del__')   #debug
+        _.deinit()
 
     # -----
 
@@ -198,12 +202,8 @@ class Telex(io.IOBase):
     # -----
 
     def __exit__(_, type, value, tb):
-        print('__exit__')
-        if _._tty:
-            del _._tty
-        if _._ledSt:
-            _._ledSt.attractor(0)
-            _._ledSt.deinit()
+        print('__Telex_exit__')   #debug
+        _.deinit()
 
     # -----
 
@@ -222,7 +222,7 @@ class Telex(io.IOBase):
     # -----
 
     def __call__(_):
-        print('Hello')
+        print('Telex - nothing to call')   #debug
         
     # -----
 
@@ -230,11 +230,11 @@ class Telex(io.IOBase):
         try:
             return "<Telex '{}', tx={}{}, rx={}{}, baud={}, tty={}>".format(
                 _.cnf['NAME'],
-                _.cnf['PIN']['TXD']['GPIO'],
-                'i' if _.cnf['PIN']['TXD'].get('INVERT', False) else '',
-                _.cnf['PIN']['RXD']['GPIO'],
-                'i' if _.cnf['PIN']['RXD'].get('INVERT', False) else '',
-                _.cnf['BAUD'],
+                _.cnf['PIN']['TTY_TX']['GPIO'],
+                'i' if _.cnf['PIN']['TTY_TX'].get('INVERT', False) else '',
+                _.cnf['PIN']['TTY_RX']['GPIO'],
+                'i' if _.cnf['PIN']['TTY_RX'].get('INVERT', False) else '',
+                _.cnf['TTY_BAUD'],
                 _._tty.getStateStr()
                 )
         except:
@@ -243,7 +243,7 @@ class Telex(io.IOBase):
     # =====
 
     def ioctl(_, req, arg):
-        # control stream to be used with select
+        'control stream to be used with select'
         ret = MP_STREAM_ERROR
         if req == MP_STREAM_POLL:
             ret = 0
@@ -270,7 +270,7 @@ class Telex(io.IOBase):
     # -----
 
     def write(_, ascii:str) -> None:
-        # convert the given ASCII text to baudot-murray-code and send to tty
+        'convert the given ASCII text to baudot-murray-code and send to tty'
         _._syncCharBuffer()
 
         for a in ascii:
@@ -291,14 +291,14 @@ class Telex(io.IOBase):
     # -----
 
     def any(_) -> int:
-        # is any ASCII char or escape sequence available?
+        'is any ASCII char or escape sequence available?'
         _._syncCharBuffer()
         return len(_._rxCharBuffer)
 
     # -----
 
     def read(_, count:int=1) -> str:
-        # get a single translated char or escape sequence as string
+        'get a single translated char or escape sequence as string'
         _._syncCharBuffer()
         ret = ''
         while _._rxCharBuffer and count > 0:
@@ -343,13 +343,14 @@ class Telex(io.IOBase):
     # =====
 
     def getCharMode(_) -> int:
-        # return the current TTY mode - 0='A...' 1='1...'
+        'return the current TTY mode - 0="A..." 1="1..."'
         _._syncCharBuffer()
         return _._bm._ModeBM
 
     # -----
 
     def cmd(_, c:str) -> None:
+        'interpret user commands to control hardware and data flow'
         c = c.upper()
 
         if c == 'Q':

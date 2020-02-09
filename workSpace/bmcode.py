@@ -39,25 +39,32 @@ CCITT-2:
 111.01      X       /
 111.10      V       =
 111.11      LTRS    LTRS -> [
-
 """
 
-__author__ = "Jochen Krapf"
-__email__ = "jk@nerd2nerd.org"
-__copyright__ = "Copyright 2020, JK"
-__license__ = "GPL3"
-__version__ = "0.0.1"
+try:  # try MicroPython
+    import uos as os
+    MICROPYTHON = True
+except:  # CPython
+    MICROPYTHON = False
+    __author__ = "Jochen Krapf"
+    __email__ = "jk@nerd2nerd.org"
+    __copyright__ = "Copyright 2020, JK"
+    __license__ = "GPL3"
+    __version__ = "0.0.1"
 
 ###############################################################################
 
 
 class BaudotMurrayCode:
+    'Converter for Baudot-Murray-code'
     # Baudot-Murray-Code to ASCII table
     _LUT_BM2A_STD = [
-        "~E\nA SIU\rDRJNFCKTZLWHYPQOBG]MXV[", "~3\n- '87\r@4%,~:(5+)2~6019?~]./=["
+        "~E\nA SIU\rDRJNFCKTZLWHYPQOBG]MXV[", 
+        "~3\n- '87\r@4%,~:(5+)2~6019?~]./=["
     ]
     _LUT_BM2A_US = [
-        "~E\nA SIU\rDRJNFCKTZLWHYPQOBG]MXV[", "~3\n- %87\r$4',!:(5\")2@6019?&]./;["
+        "~E\nA SIU\rDRJNFCKTZLWHYPQOBG]MXV[", 
+        "~3\n- %87\r$4',!:(5\")2@6019?&]./;["
     ]
     # Baudot-Murray-Code mode switch codes
     _LUT_BMsw = [0x1F, 0x1B]
@@ -161,7 +168,7 @@ class BaudotMurrayCode:
     # -----
 
     def encodeA2BM(self, ascii: str) -> list:
-        ''' convert an ASCII string to a list of baudot-murray-coded bytes '''
+        'convert an ASCII string to a list of baudot-murray-coded bytes'
         ret = []
 
         ascii = ascii.upper()
@@ -194,7 +201,7 @@ class BaudotMurrayCode:
     # -----
 
     def decodeBM2A(self, code: list) -> str:
-        ''' convert a list/bytearray of baudot-murray-coded bytes to an ASCII string '''
+        'convert a list/bytearray of baudot-murray-coded bytes to an ASCII string'
         ret = ''
 
         for b in code:

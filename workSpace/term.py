@@ -1,43 +1,50 @@
 #!python3
 """
+Example and test program for module telex.
+It can be used as a terminal (keyboard and screen) to control a teletype based on Baudot-Murray-code.
+Usage:
+    >>>import term
+    >>>term.run('myconfig.json')
+or simpler:
+    >>>from term import *
+    >>>utx
 """
-__author__ = "Jochen Krapf"
-__email__ = "jk@nerd2nerd.org"
-__copyright__ = "Copyright 2020, JK"
-__license__ = "GPL3"
-__version__ = "0.0.1"
 
 try:  # try MicroPython
     import uos as os
     MICROPYTHON = True
 except:  # CPython
     MICROPYTHON = False
+    __author__ = "Jochen Krapf"
+    __email__ = "jk@nerd2nerd.org"
+    __copyright__ = "Copyright 2020, JK"
+    __license__ = "GPL3"
+    __version__ = "0.0.1"
 
 # import system modules used in this module
 import gc
-gc.collect()
 import select
 import sys
-
-# preimport system modules to reduce memory usage in importing telex module
-if MICROPYTHON:
-    gc.collect()
-    import machine
-    gc.collect()
-    import json
-    gc.collect()
-    import tty
-    gc.collect()
+import time
 
 # import telex module
 import telex
+print('Free Memory 1:', gc.mem_free())
 gc.collect()
+print('Free Memory 1:', gc.mem_free())
+time.sleep(1)
+gc.collect()
+print('Free Memory 1:', gc.mem_free())
+
+###############################################################################
 
 REPLACE = {
   '\n': '\r\n',
   '<': '\r',
   '|': '\n',
 }
+
+###############################################################################
 
 def run(cnfName:str=None):
     print('')
@@ -47,15 +54,20 @@ def run(cnfName:str=None):
     print(r" / /|_/ / / __/ __/ _ \/ / / -_) / -_) \ /")
     print(r"/_/  /_/_/\__/_/  \___/_/  \__/_/\__/_\_\ ")
     print('')
-    print('Platform:        ', sys.platform)
-    print('Version:         ', sys.version)
-    print('Implementation:  ', sys.implementation)
-    print('Free Memory:     ', gc.mem_free())
 
     with telex.Telex(cnfName) as tlx:
-        #print('Config:          ', tlx.cnf)
-        print('Config Name:     ', tlx.cnf['NAME'])
-        #print('')
+        if tlx.verbose:
+            print('Platform:        ', sys.platform)
+            print('Version:         ', sys.version)
+            print('Implementation:  ', sys.implementation)
+            print('Free Memory:     ', gc.mem_free())
+            #print('Config:          ', tlx.cnf)
+            print('Config Name:     ', tlx.cnf['NAME'])
+            if 'FAKE_TN' in tlx.cnf and tlx.cnf['FAKE_TN']:
+                print('Fake TN:         ', tlx.cnf['FAKE_TN'])
+            print('Telex Object:    ', tlx)
+            print('Type <ESC> H for Help')
+            #print('')
         print('='*42)
 
         # polling from stdin
@@ -72,8 +84,8 @@ def run(cnfName:str=None):
                 for readable in readables:
                     a = readable.read(1)
                     if a:
-                        #print('a', a, type(a))
-                        #print(ord(a))
+                        #print('a', a, type(a))   #debug
+                        #print(ord(a))   #debug
                         if readable == tlx:   # from teletype
                             print(a, end='')
                         else:   # from user
@@ -85,13 +97,16 @@ def run(cnfName:str=None):
         except KeyboardInterrupt :
             pass
 
-        print('\r\nEXIT')
+        tlx.power(False)
 
+    print('\r\n<EXIT>')
+
+###############################################################################
 
 if __name__ == "__main__":
     run()
 
-# helper class to use "utx" in repl
+# helper class to use command "utx" in repl
 # >>>from term import *
 # >>>utx
 # >>>utx('myconfig.json')

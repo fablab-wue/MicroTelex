@@ -2,23 +2,25 @@
 """
 ...luminosity in 33 steps (0..32)
 
+TODO more text
+
 Usage:
 import statusLED
 s = statusLED.StatusLED(5)
 s.attractor(24)
 s.add(-8)
 """
-__author__ = "Jochen Krapf"
-__email__ = "jk@nerd2nerd.org"
-__copyright__ = "Copyright 2020, JK"
-__license__ = "GPL3"
-__version__ = "0.0.1"
 
 try:  # try MicroPython
     import uos as os
     MICROPYTHON = True
 except:  # CPython
     MICROPYTHON = False
+    __author__ = "Jochen Krapf"
+    __email__ = "jk@nerd2nerd.org"
+    __copyright__ = "Copyright 2020, JK"
+    __license__ = "GPL3"
+    __version__ = "0.0.1"
 
 if MICROPYTHON:
     from machine import Pin
@@ -39,7 +41,7 @@ class StatusLED:
     MAX_PWM = 1023
     MAX_VAL = 32
 
-    def __init__(_, led:int = 5, invert:bool=False):
+    def __init__(_, led:int = 5, invert:bool=False, timer_id:int=2):
         _._pin = Pin(led, Pin.OUT, value=0)
         _._pwm = PWM(_._pin, freq=125, duty=512)
         _._invert = invert
@@ -47,8 +49,10 @@ class StatusLED:
         _._val_last = -1
         _._atr = 16
 
-        _._timer = Timer(2)
+        _._timer = Timer(timer_id)
         _._timer.init(period=50, mode=Timer.PERIODIC, callback=_._timer_callback)
+
+    # -----
 
     def deinit(_):
         _._timer.deinit()
@@ -83,7 +87,7 @@ class StatusLED:
             _._val -= 1
         elif _._val < _._atr:
             _._val += 1
-        #print('.', end='')
+        #print('.', end='')   #debug
 
         # limits
         val = _._val
@@ -103,21 +107,3 @@ class StatusLED:
             _._pwm.duty(val)
 
 ###############################################################################
-'''
-
-from machine import Timer
-
-tim = Timer(1)
-tim.init(period=5000, mode=Timer.PERIODIC, callback=lambda t:print(5))
-tim.init(period=2000, mode=Timer.PERIODIC, callback=lambda t:print(2))
-
-
-
-from machine import Timer
-tim1 = Timer(1)
-tim2 = Timer(2)
-print(tim1, tim2)
-tim1.init(period=5000, mode=Timer.PERIODIC, callback=lambda t:print(5))
-tim2.init(period=2000, mode=Timer.PERIODIC, callback=lambda t:print(2))
-
-'''

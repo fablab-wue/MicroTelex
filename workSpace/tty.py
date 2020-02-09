@@ -8,17 +8,17 @@ RX      D3  GPIO0 (with pullup, boot, (board Button))
 Free    D0...D2, D5...D8, A0
 
 """
-__author__ = "Jochen Krapf"
-__email__ = "jk@nerd2nerd.org"
-__copyright__ = "Copyright 2020, JK"
-__license__ = "GPL3"
-__version__ = "0.0.1"
 
 try:  # try MicroPython
     import uos as os
     MICROPYTHON = True
 except:  # CPython
     MICROPYTHON = False
+    __author__ = "Jochen Krapf"
+    __email__ = "jk@nerd2nerd.org"
+    __copyright__ = "Copyright 2020, JK"
+    __license__ = "GPL3"
+    __version__ = "0.0.1"
 
 if MICROPYTHON:
     from machine import Pin
@@ -59,6 +59,7 @@ BMC_DIAL_DIGITS = (22, 23, 19, 1, 10, 16, 21, 7, 6, 24)
 
 
 class TTY:
+    'Software UART for low baud rates to fit the requirement of a historic teletype'
     DIAL_MODE_PULSE = 0
     DIAL_MODE_KEY = 1
 
@@ -119,7 +120,6 @@ class TTY:
         t += slice * 1.5
         _._txEndT = int(t + 0.5)
         _._txData = 21
-        #_._txDataBuffer = [21, 10, 0]   #debug
         _._txDataBuffer = []
 
         #  dial
