@@ -1,10 +1,27 @@
 #!python3
 
 import bmc
+'''
+•••‧••   
+
+⏺⏺⏺⦁⏺⏺ MicroTelex
+
+⏺⏺⏺•⏺⏺ MicroTelex
+
+○○○⦁○○ MicroTelex
+
+⭘⭘⭘•⭘⭘ MicroTelex
+
+⚪⚪⚪⏺⚪⚪ MicroTelex
+
+
+
+●●●⦁●● MicroTelex
+'''
 
 # standard
 
-bm = bmc.BMC(0, False, False)
+bm = bmc.BMC(0, False, 0)
 
 a = 'ABC'
 c = bm.encodeA2BM(a)
@@ -34,7 +51,7 @@ assert(a.upper() == aa)
 
 # flipped bits
 
-bm = bmc.BMC(0, True, False)
+bm = bmc.BMC(0, True, 0)
 
 a = 'ABC'
 c = bm.encodeA2BM(a)

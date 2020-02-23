@@ -56,8 +56,8 @@ except:  # CPython
 
 
 class BMC:
-    'Converter for Baudot-Murray-code'
-    # Baudot-Murray-Code to ASCII table
+    'Converter for Baudot-Murray-Code'
+    # Baudot-Murray-Code to ASCII tables
     _LUT_BM2A_ITA2 = (
         "~E\nA SIU\rDRJNFCKTZLWHYPQOBG]MXV[", 
         "~3\n- '87\r@4%,~:(5+)2~6019?~]./=["
@@ -77,7 +77,6 @@ class BMC:
     _LUT_BMsw_MKT2 = (0x1F, 0x1B, 0x00)
 
     # Baudot-Murray-Code valid ASCII table
-    # _valid_char = " ABCDEFGHIJKLMNOPQRSTUVWXYZ~3\n- '87\r@4%,~:(5+)2~6019?~]./=[#"
     _valid_convert_chars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+=:/()?.,'\n\r"
     _LUT_convert_chars = {
         'Ä': 'AE',
@@ -163,10 +162,10 @@ class BMC:
 
     # =====
 
-    def __init__(_, coding:int=0, flip_bits:bool=False, show_all_BuZi:bool=True):
+    def __init__(_, coding:int=0, flip_bits:bool=False, show_BuZi:int=2):
         _._mode = None  # 0=LTRS 1=FIGS
         _._flip_bits = flip_bits
-        _._show_all_BuZi = show_all_BuZi
+        _._show_BuZi = show_BuZi # 0=None 1=OnlyExplicit 2=All
         if coding == _.CODING_US:
             _._LUT_BM2A = _._LUT_BM2A_US
             _._LUT_BMsw = _._LUT_BMsw_US
@@ -199,13 +198,14 @@ class BMC:
 
         for a in ascii:
             try:  # symbol in current layer?
-                b = _._LUT_BM2A[_._mode].index(a)
+                nm = _._mode
+                b = _._LUT_BM2A[nm].index(a)
                 ret.append(b)
                 if b in _._LUT_BMsw:  # explicit Bu or Zi
                     _._mode = _._LUT_BMsw.index(b)
             except ValueError:
                 try:  # symbol in other layer?
-                    nm = _._mode + 1
+                    nm += 1
                     if nm >= len(_._LUT_BM2A):
                         nm = 0
                     b = _._LUT_BM2A[nm].index(a)
@@ -246,14 +246,17 @@ class BMC:
                     mode = _._LUT_BMsw.index(b)
                     if _._mode != mode:
                         _._mode = mode
-                    if not _._show_all_BuZi:
+                        if _._show_BuZi == 0: # no BuZi
+                            continue
+                    if _._show_BuZi <= 1: # explicit BuZi
                         continue
-
-                if _._mode is None:
-                    _._mode = 0  # letters
 
                 if b >= 0x20:
                     ret += '{' + hex(b)[2:] + '}'
+                elif _._mode is None:
+                    ret += '?'
+                    ret += _._LUT_BM2A[0][b]
+                    ret += _._LUT_BM2A[1][b]
                 else:
                     ret += _._LUT_BM2A[_._mode][b]
             except:
