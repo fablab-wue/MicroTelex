@@ -2,14 +2,14 @@
 
 <img src="https://raw.githubusercontent.com/wiki/fablab-wue/MicroTelex/img/MicroTelexLogo80.png" width="80px" align="right">
 
-# *µTx* - MicroTelex
+# ○○○⦁○○ MicroTelex ○○○⦁○○
 
 Control a historic teletype device (Telex) with a ESP8266 or ESP32 in MicroPython
 
 Most hardware examples from project [piTelex](https://github.com/fablab-wue/piTelex) also works with this software on an ESP board.
 The software is rewritten in a simpler way to support the ESP MicroPython environment.
 
-_*STATUS: STILL IN BETA PHASE*_
+_*STATUS: STILL IN BETA PHASE WITH WORKING PROTOTYPES*_
 
 ### Features
 
@@ -26,3 +26,5 @@ _*STATUS: STILL IN BETA PHASE*_
 
 
 TODO more description...
+
+### Description in the [wiki pages](https://github.com/fablab-wue/MicroTelex/wiki)
