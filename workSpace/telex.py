@@ -55,7 +55,7 @@ else:  # CPython
         return x
 
 from tty import TTY
-from bmcode import BaudotMurrayCode
+from bmc import BMC
 import json
 from statusLED import StatusLED
 gc.collect()
@@ -99,7 +99,7 @@ class Telex(io.IOBase):
 
         # coder from BaudotMurrayCode to ASCII
         
-        _._bm = BaudotMurrayCode()
+        _._bm = BMC()
         _._modeBM = 0
 
         # config file
@@ -179,7 +179,7 @@ class Telex(io.IOBase):
     # -----
 
     def deinit(_):
-        print('__Telex_deinit__')   #debug
+        #print('__Telex_deinit__')   #debug
         if _._tty:
             _._tty.deinit()
             del _._tty
@@ -191,7 +191,7 @@ class Telex(io.IOBase):
     # -----
 
     def __del__(_):
-        print('__Telex_del__')   #debug
+        #print('__Telex_del__')   #debug
         _.deinit()
 
     # -----
@@ -202,7 +202,7 @@ class Telex(io.IOBase):
     # -----
 
     def __exit__(_, type, value, tb):
-        print('__Telex_exit__')   #debug
+        #print('__Telex_exit__')   #debug
         _.deinit()
 
     # -----
@@ -308,7 +308,7 @@ class Telex(io.IOBase):
 
     # -----
 
-    def writeCode(_, codes: list) -> None:
+    def writeCode(_, codes: bytes) -> None:
         for code in codes:
             if code == 0x1F:   # LTRS
                 _._modeBM = 0
@@ -328,7 +328,7 @@ class Telex(io.IOBase):
 
     # -----
 
-    def readCode(_, count:int=1) -> list:
+    def readCode(_, count:int=1) -> bytes:
         codes = _._tty.read(count)
         for code in codes:
             if code == 0x1F:   # LTRS

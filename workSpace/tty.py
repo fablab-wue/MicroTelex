@@ -332,7 +332,7 @@ class TTY:
 
         if _._state & STATE_MASK_CAN_TX:
             if _._txDataBuffer:
-                _._txData = _._txDataBuffer.pop(0)
+                _._txData = _._txDataBuffer.pop(0) # use pop() for atomic read
                 if _._txData is bytes:
                     _._txData = int(_._txData)
                 _._setPinValueTX(0)
@@ -342,8 +342,11 @@ class TTY:
 
     # =====
 
-    def write(_, codes: list) -> None:
-        _._txDataBuffer += codes
+    def write(_, codes: bytes) -> None:
+        if isinstance(codes, list):
+            _._txDataBuffer += codes
+        else:
+            _._txDataBuffer += list(codes)
 
     # -----
 
@@ -352,17 +355,20 @@ class TTY:
 
     # -----
 
-    def read(_, count:int=1) -> list:
+    def read(_, count:int=1) -> bytes:
         ret = []
         while _._rxDataBuffer and count > 0:
-            ret.append(_._rxDataBuffer.pop(0))
+            ret.append(_._rxDataBuffer.pop(0)) # use pop() for atomic read
             count -= 1
-        return ret
+        return bytes(ret)
 
     # -----
 
-    def readAdd(_, codes:list) -> None:
-        _._rxDataBuffer += codes
+    def readAdd(_, codes:bytes) -> None:
+        if isinstance(codes, list):
+            _._rxDataBuffer += codes
+        else:
+            _._rxDataBuffer += list(codes)
 
     # -----
 
