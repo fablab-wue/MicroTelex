@@ -1,13 +1,13 @@
-# userver.py Demo of simple uasyncio-based echo server
+#!python3
+"""
+Socket server for MicroTelex
+"""
 
-# Released under the MIT licence
-# Copyright (c) Peter Hinch 2019
+###############################################################################
 
-#import usocket as socket
 import uasyncio as asyncio
-#import uselect as select
-#import ujson
-#from heartbeat import heartbeat  # Optional LED flash
+
+###############################################################################
 
 class Server:
     MSG_WELCOME = '-=TELEX=-\r\n'
@@ -58,16 +58,18 @@ class Server:
             await swriter.awrite(data)
 
 
-loop = asyncio.get_event_loop()
-# Optional fast heartbeat to confirm nonblocking operation
-#loop.create_task(heartbeat(100))
+    def close(self):
+        pass
+
+###############################################################################
+
 server = Server()
+loop = asyncio.get_event_loop()
 try:
     loop.call_soon(server.start_server())
     loop.run_forever()
-    #loop.run_until_complete(server.run(loop))
+    #loop.run_until_complete(server.start_server())
 except KeyboardInterrupt:
     print('Interrupted')  # This mechanism doesn't work on Unix build.
 finally:
-    #server.close()
-    pass
+    server.close()
